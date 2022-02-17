@@ -2,9 +2,7 @@ import librosa
 import matplotlib.pyplot as plt
 import numpy as np
 
-from skimage.io import imsave
 
-from scipy.fft import fft
 from librosa import display
 
 #all audio handling functions
@@ -12,8 +10,6 @@ from librosa import display
 def load_audio_file(filepath, sr):
    return librosa.load(filepath, sr=sr)
 
-def wav_to_spectrum(wav):
-   return np.abs(fft(wav))
 
 def wav_to_mel(wav, sr, n_fft, hop_length, n_mels):
    #print("in wav_to_mel")
@@ -21,7 +17,7 @@ def wav_to_mel(wav, sr, n_fft, hop_length, n_mels):
    #print("wav.shape=", wav.shape)
    #print("sr=", sr)
 
-   mel_spectrogram = librosa.feature.melspectrogram(wav, sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)
+   mel_spectrogram = librosa.feature.melspectrogram(y=wav, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)
    
    #print("type(mel_spectrogram)=", type(mel_spectrogram))
    
@@ -76,9 +72,6 @@ def test(filepath):
 
    plot_spectrum(log_mel_spectrogram, sr)
 
-def save_image(filename, x,):
-   # use skimage and save numpy array to image
-   imsave(filename, x)   
    
    
       

@@ -1,4 +1,4 @@
-# given a file name, get actor ID and emotion label
+from label_builder import LabelBuilder
 
 def get_file_info(filename):
    emotion_dict = {'SAD' : 'sadness',
@@ -14,14 +14,11 @@ def get_file_info(filename):
    emotion_label = emotion_dict[file_info[2]]
    return (actor_id, emotion_label)
 
-def create_label_dict(data_list):
-   dict = {}
-   i = 0
+def create_label_builder(data_list):
+   lb = LabelBuilder()
    for file in data_list:
       file_info = file.split('_')
       emotion_label = file_info[2]
-      if dict.get(emotion_label) is None:
-         dict[emotion_label] = i
-         i += 1
-   return dict
+      lb.add_label(emotion_label)
+   return lb
 
