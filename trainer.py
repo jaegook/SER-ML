@@ -119,6 +119,9 @@ class SERTrainer:
          avg_loss = total_loss / (step + 1)
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
          #evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
+         
+         cont_model_path = make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
+         save_contrastive_model(self.encoder, self.contrastive_model, cont_model_path, epoch, avg_loss)
          """
          start_time = time.time()
          val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.model, self.loss_fn, self.device)
@@ -195,16 +198,18 @@ class SERTrainer:
       model_path = f"{model_dir}/SER_SUPCON_{epoch}_{loss}.pth"
       return model_path
       
-   def save_contrastive_model(self, model, model_path, epoch, best_loss):
+   def save_contrastive_model(self, encoder, contrastive_model, model_path, epoch, best_loss):
       state = {
                'epoch': epoch,
-               'state_dict': model.state_dict(),
+               'encoder_state_dict': encoder.state_dict(),
+               'contrastive_state_dict': contrastive_model.state_dict(),
                'optimizer': self.optimizer.state_dict(),
                'scheduler': self.lr_scheduler.state_dict(),
                'best_loss': best_loss,
                }
       print("saving to {}...".format(model_path))
       torch.save(state, model_path)
+   
    
 def parse_args():
    parser = argparse.ArgumentParser()
