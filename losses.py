@@ -14,7 +14,7 @@ class ContrastiveLoss(nn.Module):
          features = torch.cat(x, dim=0)                                 #features: shape-> [12,128]
          features_dot_prod = torch.matmul(features, features.T)         #features_dot_prod: shape-> [12,12] because [12,128] * [128,12]
          features_dot_prod = torch.div(features_dot_prod, temperature)  #divide features_dot_prod by temperature
-         max_dot, _ = torch.max(features_dot_prod, dim=1, keepdim=2)
+         max_dot, _ = torch.max(features_dot_prod, dim=1, keepdim=True)
          features_dot_prod -= max_dot.detach()
          
          mask = mask.repeat(n_views, n_views)                           #repeat is also called tiling, n_views = 2, mask shape is now [12,12]

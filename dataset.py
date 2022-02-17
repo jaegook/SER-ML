@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from file_utils import recursive_filter_wav_files
 from audio_utils import load_audio_file, wav_to_mel
 from crema_utils import create_label_builder
-#from hparams import Hyperparameters
+
 class SER(Dataset):
    def __init__(self, data_dir, hparams):
       self.data_list = recursive_filter_wav_files(data_dir)	# data_list contains filenames of our wavefile
@@ -152,7 +152,11 @@ class SERContrastive(SER):
         
             
          list = []
+         if key == emotion_label:
+            list.append(anchor)
          for i in range(start, end):
+            #if key == emotion_label:
+            #   print("KEY==EMOTION_LABEL, START={}, END={}".format(start, end))
             if key == emotion_label and file_list[i] == wav_file_path:  #we don't want duplicate data so pick a random data 
                #print("KEY == EMOTION AND file_list[i] == wav_file_path, i = {}",format(i))
                if len(file_list) - end > 0:
@@ -179,13 +183,11 @@ class SERContrastive(SER):
             assert(lm_spectrogram.shape == (1,32,101))
             #print("type(lm_spectrogram)={} lm_spectrogram.shape={}".format(type(lm_spectrogram), lm_spectrogram.shape))
             
-            if key == emotion_label:
-               list.append(anchor)
             list.append(lm_spectrogram)
             self.data_dict[key][0] += 1
          
-         list = np.vstack(list) #after np.vstack list shape is [2,32,101]
-         #print("type(list)={}, len(list)={}, list.shape={}".format(type(list), len(list), list.shape))
+         list = np.vstack(list) #after np.vstack list shape is [self.hparams.num_contrastive_samples,32,101]
+         print("type(list)={}, len(list)={}, list.shape={}".format(type(list), len(list), list.shape))
          if key == emotion_label:            
             if len(pos_neg_examples)==0:
                pos_neg_examples.append(list)
@@ -196,7 +198,7 @@ class SERContrastive(SER):
             pos_neg_examples.append(list)
       #print("before np.concat: pos_neg_examples.shape=", np.shape(pos_neg_examples))
       #for pos_negs in pos_neg_examples:
-         #print("pos_negs.shape=", pos_negs.shape)
+      #   print("pos_negs.shape=", pos_negs.shape)
       pos_neg_examples = np.concatenate(pos_neg_examples, axis=2)
       labels = np.array(labels)
       #print("IN __getitem__: pos_neg_examples.shape={}, labels.shape={}".format(pos_neg_examples.shape, labels.shape))
