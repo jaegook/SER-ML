@@ -23,7 +23,8 @@ class Hyperparameters:
    num_frames = 101
    temperature = 0.1
    
-   contrastive_display_step = 1
+   contrastive_validation_step = 200
+   contrastive_display_step = 10
 # directories to make
    labels_dir = "labels"	#directory to save label_to_id dictionaries
    model_dir = "models"		#directory to save models

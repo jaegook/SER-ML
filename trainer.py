@@ -111,14 +111,22 @@ class SERTrainer:
             
             train_loss = self.contrastive_train_step(encoder_input, labels)
             total_loss += train_loss
-            if step % self.hparams.contrastive_display_step == 0:
+            if step + 1 % self.hparams.contrastive_display_step == 0:
                print("Epoch = {}, Step = {}, Training Loss = {}".format(epoch, step, train_loss))
+               end_time = time.time()
+               print(f"Elapsed time for {step}: {(end_time-start_time)/60}")
+            if step + 1 % self.hparams.contrastive_validation_step == 0:
+               avg_loss = total_loss / (step + 1)
+               contrastive_model = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
+               save_contrastive_model(self.encoder, self.contrastive_model, contrastive_model, epoch, avg_loss)
          end_time = time.time()
          print("time for 1 epoch (min) =",(end_time-start_time)/60)
          print("Validating...")
          avg_loss = total_loss / (step + 1)
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
          #evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
+         cont_model_path = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
+         self.save_contrastive_model(self.encoder, self.contrastive_model, cont_model_path, epoch, avg_loss)
          """
          start_time = time.time()
          val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.model, self.loss_fn, self.device)
@@ -159,7 +167,7 @@ class SERTrainer:
          print("Validating...")
          avg_loss = total_loss / (step + 1)
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
-         evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
+         #evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
          """
          start_time = time.time()
          val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.model, self.loss_fn, self.device)

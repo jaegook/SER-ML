@@ -187,7 +187,7 @@ class SERContrastive(SER):
             self.data_dict[key][0] += 1
          
          list = np.vstack(list) #after np.vstack list shape is [self.hparams.num_contrastive_samples,32,101]
-         print("type(list)={}, len(list)={}, list.shape={}".format(type(list), len(list), list.shape))
+         #print("type(list)={}, len(list)={}, list.shape={}".format(type(list), len(list), list.shape))
          if key == emotion_label:            
             if len(pos_neg_examples)==0:
                pos_neg_examples.append(list)
