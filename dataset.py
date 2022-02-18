@@ -141,19 +141,19 @@ class SERContrastive(SER):
             assert(log_mel.shape == (1,32,101))
             anchor_mels_list.append(log_mel)
 
-      print(f"len(anchor_mels_list) should be {self.hparams.num_contrastive_samples}={len(anchor_mels_list)}")
+      #print(f"len(anchor_mels_list) should be {self.hparams.num_contrastive_samples}={len(anchor_mels_list)}")
 
       
       #update starting index in data_dict
       self.data_dict[anchor_label_key][0] = start_index + self.hparams.num_contrastive_samples
             
       #there should be hparams.num_contrastive_samples log_mels in the list
-      for step, log_mel in enumerate(anchor_mels_list):
-         print(f"{step + 1}: log_mel.shape should be {self.hparams.num_contrastive_samples}[1,32,101]={log_mel.shape}")
+      #for step, log_mel in enumerate(anchor_mels_list):
+      #   print(f"{step + 1}: log_mel.shape should be {self.hparams.num_contrastive_samples}[1,32,101]={log_mel.shape}")
       
       pos_examples = np.concatenate(anchor_mels_list, axis=0)
-      print(f"pos_examples.shape should be [{self.hparams.num_contrastive_samples},32,101]={pos_examples.shape}")  #pos_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
-      print(f"type(pos_examples)={type(pos_examples)}")
+      #print(f"pos_examples.shape should be [{self.hparams.num_contrastive_samples},32,101]={pos_examples.shape}")  #pos_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
+      #print(f"type(pos_examples)={type(pos_examples)}")
       pos_neg_examples = [pos_examples]
       
       #make negative mels:
@@ -162,7 +162,7 @@ class SERContrastive(SER):
       idx_to_del = neg_label_keys.index(anchor_label_key)
       del neg_label_keys[idx_to_del]
       
-      print(f"anchor_label_key={anchor_label_key}, neg_label_keys shouldn't contain anchor_label_key->{neg_label_keys}")
+      #print(f"anchor_label_key={anchor_label_key}, neg_label_keys shouldn't contain anchor_label_key->{neg_label_keys}")
       
       random.shuffle(neg_label_keys)
       neg_label_keys = neg_label_keys[:self.hparams.num_neg_examples]
@@ -190,21 +190,21 @@ class SERContrastive(SER):
             assert(log_mel.shape == (1,32,101))
             neg_examples.append(log_mel)
          neg_examples = np.concatenate(neg_examples, axis=0) #neg_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
-         print(f"type(neg_examples)={type(neg_examples)}")
+         #print(f"type(neg_examples)={type(neg_examples)}")
          pos_neg_examples.append(neg_examples)
          self.data_dict[label_key][0] = start_index + self.hparams.num_contrastive_samples
          
-      print(f"type(pos_neg_examples)={type(pos_neg_examples)}")
+      #print(f"type(pos_neg_examples)={type(pos_neg_examples)}")
       #after for loop pos_neg_examples-> should have num_neg_examples + positve examples of [num_contrastive_samples, n_mels, n_frames]
-      for i, pos_neg in enumerate(pos_neg_examples):
-         print(f"{i + 1}: pos_neg.shape should be {self.hparams.num_neg_examples + 1} of [{self.hparams.num_contrastive_samples}, 32, 101]={pos_neg.shape}")
+      #for i, pos_neg in enumerate(pos_neg_examples):
+      #   print(f"{i + 1}: pos_neg.shape should be {self.hparams.num_neg_examples + 1} of [{self.hparams.num_contrastive_samples}, 32, 101]={pos_neg.shape}")
       
       pos_neg_examples = np.concatenate(pos_neg_examples, axis=2)    #pos_neg_examples -> shape:[num_contrastive_samples, n_mels, n_frames*(num_neg_examples + 1)]
       pos_neg_label_ids = np.array(pos_neg_label_ids)
-      print(f"pos_neg_examples.shape should be [{self.hparams.num_contrastive_samples},32,{101*(self.hparams.num_neg_examples + 1)}]={pos_neg_examples.shape}")
-      print(f"pos_neg_label_ids.shape should be[{self.hparams.num_neg_examples +1},]={pos_neg_label_ids.shape}")   #pos_neg_label_ids.shape-> [num_neg_examples + 1]
-      print(f"type(pos_neg_examples)={type(pos_neg_examples)}, type(pos_neg_label_ids)={type(pos_neg_label_ids)}")
-      print(pos_neg_label_ids)
+      #print(f"pos_neg_examples.shape should be [{self.hparams.num_contrastive_samples},32,{101*(self.hparams.num_neg_examples + 1)}]={pos_neg_examples.shape}")
+      #print(f"pos_neg_label_ids.shape should be[{self.hparams.num_neg_examples +1},]={pos_neg_label_ids.shape}")   #pos_neg_label_ids.shape-> [num_neg_examples + 1]
+      #print(f"type(pos_neg_examples)={type(pos_neg_examples)}, type(pos_neg_label_ids)={type(pos_neg_label_ids)}")
+      #print(pos_neg_label_ids)
       return pos_neg_examples, pos_neg_label_ids
     
       """      
