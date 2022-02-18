@@ -106,8 +106,8 @@ class SERContrastive(SER):
       assert(anchor_log_mel_spectrogram.shape == (1,32,101))
       
       #extract label and get one hot index
-      anchor_emotion_key = anchor_wav_file_path.split('_')[2]
-      anchor_label_id = self.label_builder.get_label_id(anchor_emotion_key)
+      anchor_label_key = anchor_wav_file_path.split('_')[2]
+      anchor_label_id = self.label_builder.get_label_id(anchor_label_key)
       
       
       #create one hot vector
@@ -119,16 +119,15 @@ class SERContrastive(SER):
       #pos_neg_examples will hold anchor, and (self.hparams.num_contrastive_samples - 1) pos examples, and (self.hparams.num_contrastive_samples) neg examples per emotion
       
       anchor_mels_list = [anchor_log_mel_spectrogram]
-      anchor_pair = self.data_dict[anchor_emotion_key]
+      anchor_pair = self.data_dict[anchor_label_key]
       start_index = anchor_pair[0]
       files = anchor_pair[1]
       if start_index + self.hparams.num_contrastive_samples - 1 >= len(files):
          random.shuffle(files)
          start_index = 0
-      i = 0
+      
+      #check edge case: what if last file == anchor_wav_file_path
       for file in files[start_index:]:
-         print(f"looping through postive examples:{i}"
-         i+=1
          if len(anchor_mels_list) == self.hparams.num_contrastive_samples:
             break
          if file != anchor_wav_file_path:
@@ -141,11 +140,12 @@ class SERContrastive(SER):
             log_mel = np.expand_dims(log_mel, axis=0)
             assert(log_mel.shape == (1,32,101))
             anchor_mels_list.append(log_mel)
-      print(f"len(anchor_mels_list) should be {self.hparams.num_contrastive_samples}={len(anchor_mels_list)})
+
+      print(f"len(anchor_mels_list) should be {self.hparams.num_contrastive_samples}={len(anchor_mels_list)}")
 
       
       #update starting index in data_dict
-      self.data_dict[anchor_emotion_key][0] = start_index + self.hparams.num_contrastive_samples
+      self.data_dict[anchor_label_key][0] = start_index + self.hparams.num_contrastive_samples
             
       #there should be hparams.num_contrastive_samples log_mels in the list
       for step, log_mel in enumerate(anchor_mels_list):
@@ -153,18 +153,24 @@ class SERContrastive(SER):
       
       pos_examples = np.concatenate(anchor_mels_list, axis=0)
       print(f"pos_examples.shape should be [{self.hparams.num_contrastive_samples},32,101]={pos_examples.shape}")  #pos_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
-      
+      print(f"type(pos_examples)={type(pos_examples)}")
       pos_neg_examples = [pos_examples]
       
       #make negative mels:
-      neg_label_ids = list(self.data_dict.keys())
-      del neg_label_ids[anchor_label_id]
-      random.shuffle(neg_label_ids)
-      neg_label_ids = neg_label_ids[:self.hparams.num_neg_examples]
-      pos_neg_label_ids = [anchor_label_id] + neg_label_ids
-      pos_neg_label_ids = np.array(pos_neg_label_ids)
-      for label_id in neg_label_ids:
-         neg_pair = self.data_dict[label_id]
+      neg_label_keys = list(self.data_dict.keys())
+      
+      idx_to_del = neg_label_keys.index(anchor_label_key)
+      del neg_label_keys[idx_to_del]
+      
+      print(f"anchor_label_key={anchor_label_key}, neg_label_keys shouldn't contain anchor_label_key->{neg_label_keys}")
+      
+      random.shuffle(neg_label_keys)
+      neg_label_keys = neg_label_keys[:self.hparams.num_neg_examples]
+      pos_neg_label_ids = [anchor_label_id]
+      for label_key in neg_label_keys:
+         neg_label_id = self.label_builder.get_label_id(label_key)
+         pos_neg_label_ids.append(neg_label_id)
+         neg_pair = self.data_dict[label_key]
          start_index = neg_pair[0]
          files = neg_pair[1]
          if start_index + self.hparams.num_contrastive_samples >= len(files):
@@ -184,16 +190,21 @@ class SERContrastive(SER):
             assert(log_mel.shape == (1,32,101))
             neg_examples.append(log_mel)
          neg_examples = np.concatenate(neg_examples, axis=0) #neg_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
+         print(f"type(neg_examples)={type(neg_examples)}")
          pos_neg_examples.append(neg_examples)
+         self.data_dict[label_key][0] = start_index + self.hparams.num_contrastive_samples
+         
       print(f"type(pos_neg_examples)={type(pos_neg_examples)}")
       #after for loop pos_neg_examples-> should have num_neg_examples + positve examples of [num_contrastive_samples, n_mels, n_frames]
       for i, pos_neg in enumerate(pos_neg_examples):
          print(f"{i + 1}: pos_neg.shape should be {self.hparams.num_neg_examples + 1} of [{self.hparams.num_contrastive_samples}, 32, 101]={pos_neg.shape}")
       
       pos_neg_examples = np.concatenate(pos_neg_examples, axis=2)    #pos_neg_examples -> shape:[num_contrastive_samples, n_mels, n_frames*(num_neg_examples + 1)]
+      pos_neg_label_ids = np.array(pos_neg_label_ids)
       print(f"pos_neg_examples.shape should be [{self.hparams.num_contrastive_samples},32,{101*(self.hparams.num_neg_examples + 1)}]={pos_neg_examples.shape}")
       print(f"pos_neg_label_ids.shape should be[{self.hparams.num_neg_examples +1},]={pos_neg_label_ids.shape}")   #pos_neg_label_ids.shape-> [num_neg_examples + 1]
       print(f"type(pos_neg_examples)={type(pos_neg_examples)}, type(pos_neg_label_ids)={type(pos_neg_label_ids)}")
+      print(pos_neg_label_ids)
       return pos_neg_examples, pos_neg_label_ids
     
       """      
@@ -281,7 +292,7 @@ class SERContrastive(SER):
       #print("IN __getitem__: pos_neg_examples.shape={}, labels.shape={}".format(pos_neg_examples.shape, labels.shape))
      
       return pos_neg_examples, labels      #pos_neg_examples->shape[2,32,606] [n_contrastive_samples, n_mels, n_frames], label->shape[6,] 
-"""               
+      """               
          
       
    def build_data_dict(self):
@@ -303,10 +314,18 @@ def create_dataloader(data_dir, hparams):
    data_loader = DataLoader(ds, batch_size=hparams.batch_size, shuffle=True, num_workers=hparams.num_workers)
  
    return data_loader, ds.label_builder		
+
+def pad(batch):
+   print(f"type(batch), {type(batch)}, {len(batch)}, {type(batch[0])}, {type(batch[1])}")
+   print(f"{type(batch[0][0])}, {type(batch[0][1])}")
+   print(f"{type(batch[0][0])}, {len(batch[0][0])}")
+   print(f"{batch[0][0].shape}, {batch[0][1].shape}")
+   print(f"{batch[1][0].shape}, {batch[1][1].shape}")
+   
    
 def create_contrastive_dataloader(data_dir, hparams):
    ds = SERContrastive(data_dir, hparams)
-   data_loader = DataLoader(ds, batch_size=hparams.contrastive_batch_size, shuffle=True, drop_last=True)
+   data_loader = DataLoader(ds, batch_size=hparams.contrastive_batch_size, shuffle=True, drop_last=True)#, collate_fn=pad)
    return data_loader, ds.label_builder
 
 
@@ -317,14 +336,9 @@ def test():
    for step, (pos_neg_examples, labels) in enumerate(dl):
       print("step=",step)     
       print("type(pos_neg_examples)={}, pos_neg_examples.size()={}".format(type(pos_neg_examples), pos_neg_examples.size()))
-      print("type(labels)={}, len(labels)={}".format(type(labels), len(labels)))
+      print("type(labels)={}, labels.size()={}".format(type(labels), labels.size()))
       for i, label in enumerate(labels):
          print("{}: {}".format(i,label))
-      #for i, x in enumerate(x[0]):
-      #   print("{}) type(x) ={} len(x)={}".format(i, type(x), len(x)))
-      #for i in x[0]:
-      #   print(type(i), i.size())
-
 
 if __name__ == "__main__":
    from hparams import Hyperparameters
