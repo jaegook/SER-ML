@@ -95,9 +95,8 @@ class SERTrainer:
          start_time = time.time()
          for step, (pos_negs, labels) in enumerate(train_dataloader):
             
-            
             #query aka anchor is in pos_negs
-            pos_negs = pos_negs.to(self.device)     # pos_negs ->[10,2,32,606] 
+            pos_negs = pos_negs.to(self.device)     # pos_negs ->[batch_size, num_contrastive_samples, n_mels, n_frames*(num_neg_examples + 1 positive examples)] 
             
                           
             #manipulate the shape so we can feed it encoder who accepts shape -> [batch, 1, 32, 101]             
@@ -111,14 +110,14 @@ class SERTrainer:
             
             train_loss = self.contrastive_train_step(encoder_input, labels)
             total_loss += train_loss
-            if step + 1 % self.hparams.contrastive_display_step == 0:
+            if (step + 1) % self.hparams.contrastive_display_step == 0:
                print("Epoch = {}, Step = {}, Training Loss = {}".format(epoch, step, train_loss))
                end_time = time.time()
                print(f"Elapsed time for {step}: {(end_time-start_time)/60}")
-            if step + 1 % self.hparams.contrastive_validation_step == 0:
+            if (step + 1) % self.hparams.contrastive_validation_step == 0:
                avg_loss = total_loss / (step + 1)
                contrastive_model = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
-               save_contrastive_model(self.encoder, self.contrastive_model, contrastive_model, epoch, avg_loss)
+               self.save_contrastive_model(self.encoder, self.contrastive_model, contrastive_model, epoch, avg_loss)
          end_time = time.time()
          print("time for 1 epoch (min) =",(end_time-start_time)/60)
          print("Validating...")
