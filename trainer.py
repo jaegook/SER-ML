@@ -21,7 +21,7 @@ class SERTrainer:
       self.contrastive_model = SERContrastiveModel(hparams, device)
       self.loss_fn = nn.CrossEntropyLoss
       self.contrastive_loss_fn = ContrastiveLoss()
-      self.optimizer = optim.Adam(self.encoder.parameters(), hparams.init_lr, betas=[0.9,0.999])	# nn.module calls parameters()
+      self.optimizer = optim.Adam(list(self.encoder.parameters())+list(self.contrastive_model.parameters()), hparams.init_lr, betas=[0.9,0.999])	# nn.module calls parameters()
       self.lr_scheduler = optim.lr_scheduler.LinearLR(self.optimizer, hparams.init_lr, hparams.end_lr)
 
    def train_step(self, x, label):
@@ -150,6 +150,7 @@ class SERTrainer:
          true_label_list = []
          self.model.train()
          start_time = time.time()
+         print(f"starting training for epoch:{epoch}")
          for step, (x, label) in enumerate(train_dataloader):
             x = x.to(self.device)
             label = label.to(self.device)

@@ -180,7 +180,7 @@ class SERContrastive(SER):
       
       assert(len(pos_neg_examples) == self.hparams.num_neg_examples + 1)  
       assert(len(pos_neg_label_ids) == self.hparams.num_neg_examples + 1)      
-      print(f"type(pos_neg_examples)={type(pos_neg_examples)}")
+      #print(f"type(pos_neg_examples)={type(pos_neg_examples)}")
       #after for loop pos_neg_examples-> should have num_neg_examples + positve examples of [num_contrastive_samples, n_mels, n_frames]
       #for i, pos_neg in enumerate(pos_neg_examples):
       #   print(f"{i + 1}: pos_neg.shape should be {self.hparams.num_neg_examples + 1} of [{self.hparams.num_contrastive_samples}, 32, 101]={pos_neg.shape}")
