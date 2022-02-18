@@ -1,7 +1,7 @@
 # Speech Emotion Recognition
 
 This project intends to recognize speech emotion using deep learning.
-
+IN PROGRESS
 ## Set up
 
 Create your own virtual environment. Anaconda v3 is used for this project.
