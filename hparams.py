@@ -18,13 +18,14 @@ class Hyperparameters:
    end_lr = 5e-5	
 
 # parameters for contrastive training   
-   num_contrastive_samples = 4
+   num_contrastive_samples = 2
    contrastive_batch_size = 2
    num_frames = 101
    temperature = 0.1
    
+   num_neg_examples = 3
    contrastive_validation_step = 200
-   contrastive_display_step = 10
+   contrastive_display_step = 20
 # directories to make
    labels_dir = "labels"	#directory to save label_to_id dictionaries
    model_dir = "models"		#directory to save models

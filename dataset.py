@@ -90,42 +90,119 @@ class SERContrastive(SER):
       self.build_data_dict()
    
    def __getitem__(self, index):
-      wav_file_path = self.data_list[index]
-      wav, sr = load_audio_file(wav_file_path, self.hparams.sampling_rate)
+      anchor_wav_file_path = self.data_list[index]
+      anchor_wav, sr = load_audio_file(anchor_wav_file_path, self.hparams.sampling_rate)
       
       #find offset so we can get full sample of size = hparams.sample_size
-      offset = len(wav) - self.hparams.sample_size
-      start = random.randint(0, offset)
-      sampled_wav = wav[start:start+self.hparams.sample_size]
-      assert(len(sampled_wav) == self.hparams.sample_size)
+      anchor_offset = len(anchor_wav) - self.hparams.sample_size
+      start = random.randint(0, anchor_offset)
+      sampled_anchor_wav = anchor_wav[start:start+self.hparams.sample_size]
+      assert(len(sampled_anchor_wav) == self.hparams.sample_size)
       
       #get log_mel_spectrogram to feed to network
-      log_mel_spectrogram = wav_to_mel(sampled_wav, self.hparams.sampling_rate, self.hparams.frame_size, self.hparams.hop_length, self.hparams.n_mels)
+      anchor_log_mel_spectrogram = wav_to_mel(sampled_anchor_wav, self.hparams.sampling_rate, self.hparams.frame_size, self.hparams.hop_length, self.hparams.n_mels)
       
-      log_mel_spectrogram = np.expand_dims(log_mel_spectrogram, axis=0)
-      assert(log_mel_spectrogram.shape == (1,32,101))
+      anchor_log_mel_spectrogram = np.expand_dims(anchor_log_mel_spectrogram, axis=0)
+      assert(anchor_log_mel_spectrogram.shape == (1,32,101))
       
       #extract label and get one hot index
-      emotion_label = wav_file_path.split('_')[2]
-      one_hot_index = self.label_builder.get_label_id(emotion_label)
+      anchor_emotion_key = anchor_wav_file_path.split('_')[2]
+      anchor_label_id = self.label_builder.get_label_id(anchor_emotion_key)
       
       
       #create one hot vector
       #label = np.zeros(self.label_builder.count())
       #label[one_hot_index] = 1
       
-      labels = [one_hot_index]
+      #label_id_list = [anchor_label_id]
       
       #pos_neg_examples will hold anchor, and (self.hparams.num_contrastive_samples - 1) pos examples, and (self.hparams.num_contrastive_samples) neg examples per emotion
-      pos_neg_examples = []
-      anchor = log_mel_spectrogram
       
+      anchor_mels_list = [anchor_log_mel_spectrogram]
+      anchor_pair = self.data_dict[anchor_emotion_key]
+      start_index = anchor_pair[0]
+      files = anchor_pair[1]
+      if start_index + self.hparams.num_contrastive_samples - 1 >= len(files):
+         random.shuffle(files)
+         start_index = 0
+      i = 0
+      for file in files[start_index:]:
+         print(f"looping through postive examples:{i}"
+         i+=1
+         if len(anchor_mels_list) == self.hparams.num_contrastive_samples:
+            break
+         if file != anchor_wav_file_path:
+            wav, sr = load_audio_file(file, self.hparams.sampling_rate)
+            offset = len(wav) - self.hparams.sample_size
+            start = random.randint(0,offset)
+            sampled_wav = wav[start:start+self.hparams.sample_size]
+            assert(len(sampled_wav) == self.hparams.sample_size)
+            log_mel = wav_to_mel(sampled_wav, self.hparams.sampling_rate, self.hparams.frame_size, self.hparams.hop_length, self.hparams.n_mels)
+            log_mel = np.expand_dims(log_mel, axis=0)
+            assert(log_mel.shape == (1,32,101))
+            anchor_mels_list.append(log_mel)
+      print(f"len(anchor_mels_list) should be {self.hparams.num_contrastive_samples}={len(anchor_mels_list)})
+
+      
+      #update starting index in data_dict
+      self.data_dict[anchor_emotion_key][0] = start_index + self.hparams.num_contrastive_samples
+            
+      #there should be hparams.num_contrastive_samples log_mels in the list
+      for step, log_mel in enumerate(anchor_mels_list):
+         print(f"{step + 1}: log_mel.shape should be {self.hparams.num_contrastive_samples}[1,32,101]={log_mel.shape}")
+      
+      pos_examples = np.concatenate(anchor_mels_list, axis=0)
+      print(f"pos_examples.shape should be [{self.hparams.num_contrastive_samples},32,101]={pos_examples.shape}")  #pos_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
+      
+      pos_neg_examples = [pos_examples]
+      
+      #make negative mels:
+      neg_label_ids = list(self.data_dict.keys())
+      del neg_label_ids[anchor_label_id]
+      random.shuffle(neg_label_ids)
+      neg_label_ids = neg_label_ids[:self.hparams.num_neg_examples]
+      pos_neg_label_ids = [anchor_label_id] + neg_label_ids
+      pos_neg_label_ids = np.array(pos_neg_label_ids)
+      for label_id in neg_label_ids:
+         neg_pair = self.data_dict[label_id]
+         start_index = neg_pair[0]
+         files = neg_pair[1]
+         if start_index + self.hparams.num_contrastive_samples >= len(files):
+            random.shuffle(files)
+            start_index = 0
+         neg_examples = []
+         for file in files:
+            if len(neg_examples) == self.hparams.num_contrastive_samples:
+               break
+            wav, sr = load_audio_file(file, self.hparams.sampling_rate)
+            offset = len(wav) - self.hparams.sample_size
+            start = random.randint(0,offset)
+            sampled_wav = wav[start:start+self.hparams.sample_size]
+            assert(len(sampled_wav) == self.hparams.sample_size)
+            log_mel = wav_to_mel(sampled_wav, self.hparams.sampling_rate, self.hparams.frame_size, self.hparams.hop_length, self.hparams.n_mels)
+            log_mel = np.expand_dims(log_mel, axis=0)
+            assert(log_mel.shape == (1,32,101))
+            neg_examples.append(log_mel)
+         neg_examples = np.concatenate(neg_examples, axis=0) #neg_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
+         pos_neg_examples.append(neg_examples)
+      print(f"type(pos_neg_examples)={type(pos_neg_examples)}")
+      #after for loop pos_neg_examples-> should have num_neg_examples + positve examples of [num_contrastive_samples, n_mels, n_frames]
+      for i, pos_neg in enumerate(pos_neg_examples):
+         print(f"{i + 1}: pos_neg.shape should be {self.hparams.num_neg_examples + 1} of [{self.hparams.num_contrastive_samples}, 32, 101]={pos_neg.shape}")
+      
+      pos_neg_examples = np.concatenate(pos_neg_examples, axis=2)    #pos_neg_examples -> shape:[num_contrastive_samples, n_mels, n_frames*(num_neg_examples + 1)]
+      print(f"pos_neg_examples.shape should be [{self.hparams.num_contrastive_samples},32,{101*(self.hparams.num_neg_examples + 1)}]={pos_neg_examples.shape}")
+      print(f"pos_neg_label_ids.shape should be[{self.hparams.num_neg_examples +1},]={pos_neg_label_ids.shape}")   #pos_neg_label_ids.shape-> [num_neg_examples + 1]
+      print(f"type(pos_neg_examples)={type(pos_neg_examples)}, type(pos_neg_label_ids)={type(pos_neg_label_ids)}")
+      return pos_neg_examples, pos_neg_label_ids
+    
+      """      
       #key will be 1 of the 6 emotions, vals[0] = current starting index, vals[1] = list of data for the key
       for key, vals in self.data_dict.items():
          assert(len(vals[1]) > self.hparams.num_contrastive_samples)
          #start_index = vals[0]
          start = vals[0]
-         if key == emotion_label:       # we need one less positive example
+         if key == anchor_emotion_label:       # we need one less positive example
             #end_index = start_index + (self.hparams.num_contrastive_samples - 2)
             end = start + (self.hparams.num_contrastive_samples - 1)
          else:
@@ -145,19 +222,19 @@ class SERContrastive(SER):
             file_list = self.data_dict[key][1]
             self.data_dict[key][0] = 0
             start = self.data_dict[key][0]    
-            if key == emotion_label:
+            if key == anchor_emotion_label:
                end = start + (self.hparams.num_contrastive_samples - 1)
             else:
                end = start + self.hparams.num_contrastive_samples
         
             
          list = []
-         if key == emotion_label:
-            list.append(anchor)
+         if key == anchor_emotion_label:
+            list.append(anchor_mel)
          for i in range(start, end):
             #if key == emotion_label:
             #   print("KEY==EMOTION_LABEL, START={}, END={}".format(start, end))
-            if key == emotion_label and file_list[i] == wav_file_path:  #we don't want duplicate data so pick a random data 
+            if key == anchor_emotion_label and file_list[i] == wav_file_path:  #we don't want duplicate data so pick a random data 
                #print("KEY == EMOTION AND file_list[i] == wav_file_path, i = {}",format(i))
                if len(file_list) - end > 0:
                   #print("IF: len(file_list)-1 = {}, end_index={}".format(len(file_list)-1, end_index))  
@@ -188,7 +265,7 @@ class SERContrastive(SER):
          
          list = np.vstack(list) #after np.vstack list shape is [self.hparams.num_contrastive_samples,32,101]
          #print("type(list)={}, len(list)={}, list.shape={}".format(type(list), len(list), list.shape))
-         if key == emotion_label:            
+         if key == anchor_emotion_label:            
             if len(pos_neg_examples)==0:
                pos_neg_examples.append(list)
             else:
@@ -204,10 +281,11 @@ class SERContrastive(SER):
       #print("IN __getitem__: pos_neg_examples.shape={}, labels.shape={}".format(pos_neg_examples.shape, labels.shape))
      
       return pos_neg_examples, labels      #pos_neg_examples->shape[2,32,606] [n_contrastive_samples, n_mels, n_frames], label->shape[6,] 
-               
+"""               
          
       
    def build_data_dict(self):
+      random.shuffle(self.data_list)
       for file in self.data_list:
          emotion = file.split('_')[2]
          if emotion not in self.data_dict:
@@ -234,7 +312,8 @@ def create_contrastive_dataloader(data_dir, hparams):
 
 def test():
    hparams = Hyperparameters()
-   dl, lb = create_contrastive_dataloader("./test", hparams)
+   dl, lb = create_contrastive_dataloader("../test", hparams)
+   print("looping through dataloader...")
    for step, (pos_neg_examples, labels) in enumerate(dl):
       print("step=",step)     
       print("type(pos_neg_examples)={}, pos_neg_examples.size()={}".format(type(pos_neg_examples), pos_neg_examples.size()))

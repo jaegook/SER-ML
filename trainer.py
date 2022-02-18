@@ -74,7 +74,7 @@ class SERTrainer:
      
       label_list = torch.unbind(labels, dim=0)
       
-      train_loss = self.contrastive_loss_fn(projection_output_list, label_list, self.hparams.temperature)
+      train_loss = self.contrastive_loss_fn(projection_output_list, label_list, self.hparams.temperature, self.device)
       
       train_loss.backward()
       self.optimizer.step()
