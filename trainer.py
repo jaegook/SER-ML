@@ -189,7 +189,7 @@ class SERTrainer:
          return best_loss
          
    def make_model_path(self, epoch, loss, model_dir):
-      model_path = f"{model_dir}/SER_SUPCON_{epoch}_{loss}.pth"
+      model_path = f"{model_dir}/SER_{epoch}_{loss}.pth"
       return model_path
       
    def save_model(self, model, model_path, epoch, best_loss):   			#need to save optimizer, best_loss, current_epoch, lr_scheduler, model.state_dict()
