@@ -9,27 +9,27 @@ class Hyperparameters:
    trim_silence = True
 
 
-# parameters for training
+# parameters for classifier training
    batch_size = 32
    num_workers = 2
    num_epochs = 50
-   num_contrastive_epochs = 20
    init_lr = 1e-3
    end_lr = 5e-5	
-
+   display_step = 50
+   validation_step = 1000
+   
 # parameters for contrastive training   
    num_contrastive_samples = 2
    contrastive_batch_size = 2
    num_frames = 101
    temperature = 0.1
-   
    num_neg_examples = 2
+   num_contrastive_epochs = 20
    contrastive_validation_step = 200
    contrastive_display_step = 2
+   
 # directories to make
    labels_dir = "labels"	#directory to save label_to_id dictionaries
    model_dir = "models"		#directory to save models
 
-# parameters for validation
-   display_step = 50
    

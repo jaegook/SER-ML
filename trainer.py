@@ -148,7 +148,7 @@ class SERTrainer:
          pred_list = []
          true_label_list = []
          self.ser_supcon.train()
-         start_time = time.time()
+         epoch_start_time = time.time()
          #print(f"starting training for epoch:{epoch}")
          for step, (x, label) in enumerate(train_dataloader):
             x = x.to(self.device)
@@ -161,28 +161,33 @@ class SERTrainer:
             total_loss += train_loss
             if step % self.hparams.display_step == 0:
                print("Epoch = {}, Step = {}, Training Loss = {}".format(epoch, step, train_loss))
-         end_time = time.time()
-         print("time for 1 epoch (min) =",(end_time-start_time)/60)
-         print("Validating...")
+            if (step+1) % self.hparams.validation_step == 0:
+               print(f"Validating for epoch: {epoch}, step: {step}")
+               best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss)
+         
+         epoch_end_time = time.time()
+         print("time for 1 epoch (min) =",(epoch_end_time-epoch_start_time)/60)
          avg_loss = total_loss / (step + 1)
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
+         print("Validating...")
+         best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss)
+  
+   def validate_and_save_model(self, valid_dataloader, epoch, best_loss):
+         val_start_time = time.time()
+         val_loss, metrics = evaluator.evaluate(valid_dataloader, self.ser_supcon, self.loss_fn, self.device)
+         val_end_time = time.time()
+         print("time for validation (min) =", (val_end_time - val_start_time)/60)
+         print("Epoch = {}, Validation Loss = {}".format(epoch, val_loss))
+         evaluator.print_metrics(metrics, label_builder)
          
-         evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
-         start_time = time.time()
-         val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.ser_supcon, self.loss_fn, self.device)
-         end_time = time.time()
-         print("time for validation (min) =", (end_time - start_time)/60)
-         print("Epoch = {}, Validation Loss = {}, Validation Accuracy = {}".format(epoch, val_loss, acc))
-         #print precision and recall for each class
-         for i, (p, r, f, s) in enumerate(zip(precision.tolist(),recall.tolist(), fscore.tolist(), support.tolist())):
-            print("for class {}, precision = {}, recall = {}, fscore = {}, support = {}".format(label_builder.get_label(i),p,r,f,s))
          if val_loss < best_loss:
             best_loss = val_loss
             print("best loss = {}".format(best_loss))            
             model_path = self.make_model_path(epoch, best_loss, self.hparams.model_dir)				#create this fn
             self.save_model(self.ser_supcon, model_path, epoch, best_loss)		                                #create this model
-  
-   
+         
+         return best_loss
+         
    def make_model_path(self, epoch, loss, model_dir):
       model_path = f"{model_dir}/SER_SUPCON_{epoch}_{loss}.pth"
       return model_path
