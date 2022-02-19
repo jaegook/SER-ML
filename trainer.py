@@ -89,7 +89,7 @@ class SERTrainer:
       for epoch in range(self.hparams.num_contrastive_epochs):
          total_loss = 0.0
          self.ser_supcon.train()
-         start_time = time.time
+         start_time = time.time()
          #print(f"starting training for epoch:{epoch}")
          for step, (pos_negs, labels) in enumerate(train_dataloader):
             
@@ -108,7 +108,7 @@ class SERTrainer:
             
             train_loss = self.contrastive_train_step(encoder_input, labels)
             total_loss += train_loss
-            if (step + 1) % self.hparams.contrastive_display_step == 0:
+            if step % self.hparams.contrastive_display_step == 0:
                print("Epoch = {}, Step = {}, Training Loss = {}".format(epoch, step, train_loss))
                end_time = time.time()
                print(f"Elapsed time for {step}: {(end_time-start_time)/60}")
@@ -162,7 +162,6 @@ class SERTrainer:
             if step % self.hparams.display_step == 0:
                print("Epoch = {}, Step = {}, Training Loss = {}".format(epoch, step, train_loss))
             if (step+1) % self.hparams.validation_step == 0:
-               print(f"Validating for epoch: {epoch}, step: {step}")
                best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss)
          
          epoch_end_time = time.time()
@@ -173,6 +172,7 @@ class SERTrainer:
          best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss)
   
    def validate_and_save_model(self, valid_dataloader, epoch, best_loss):
+         print(f"Validating for epoch: {epoch}")
          val_start_time = time.time()
          val_loss, metrics = evaluator.evaluate(valid_dataloader, self.ser_supcon, self.loss_fn, self.device)
          val_end_time = time.time()
@@ -183,8 +183,8 @@ class SERTrainer:
          if val_loss < best_loss:
             best_loss = val_loss
             print("best loss = {}".format(best_loss))            
-            model_path = self.make_model_path(epoch, best_loss, self.hparams.model_dir)				#create this fn
-            self.save_model(self.ser_supcon, model_path, epoch, best_loss)		                                #create this model
+            model_path = self.make_model_path(epoch, best_loss, self.hparams.model_dir)				            #
+            self.save_model(self.ser_supcon, model_path, epoch, best_loss)		                                
          
          return best_loss
          

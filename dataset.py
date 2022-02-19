@@ -127,16 +127,15 @@ class SERContrastive(SER):
          start_index = 0
       
       assert(len(files) >= self.hparams.num_contrastive_samples)
-      anchor_mels_list += self.get_contrastive_samples(files, start_index, len(anchor_mels_list), anchor_wav_file_path)
+      anchor_mels_list += self.get_contrastive_samples(files, start_index, len(anchor_mels_list), anchor_wav_file_path, anchor_label_key)
       if len(anchor_mels_list) < self.hparams.num_contrastive_samples:
          random.shuffle(files)
          start_index = 0
-         anchor_mels_list += self.get_contrastive_samples(files, start_index, len(anchor_mels_list), anchor_wav_file_path)
+         anchor_mels_list += self.get_contrastive_samples(files, start_index, len(anchor_mels_list), anchor_wav_file_path, anchor_label_key)
       assert(len(anchor_mels_list) == self.hparams.num_contrastive_samples)  
 
       #print(f"len(anchor_mels_list) should be {self.hparams.num_contrastive_samples}={len(anchor_mels_list)}")
       #update starting index in data_dict
-      self.data_dict[anchor_label_key][0] = start_index + self.hparams.num_contrastive_samples
             
       #there should be hparams.num_contrastive_samples log_mels in the list
       #for step, log_mel in enumerate(anchor_mels_list):
@@ -167,16 +166,14 @@ class SERContrastive(SER):
          if start_index + self.hparams.num_contrastive_samples >= len(files):
             random.shuffle(files)
             start_index = 0
- 
          neg_examples = []
          assert(len(files) >= self.hparams.num_contrastive_samples)
-         neg_examples += self.get_contrastive_samples(files, start_index, len(neg_examples), anchor_wav_file_path)
+         neg_examples += self.get_contrastive_samples(files, start_index, len(neg_examples), anchor_wav_file_path, label_key)
          assert(len(neg_examples) == self.hparams.num_contrastive_samples)
      
          neg_examples = np.concatenate(neg_examples, axis=0) #neg_examples-> shape:[num_contrastive_samples, n_mels, n_frames]
          #print(f"type(neg_examples)={type(neg_examples)}")
          pos_neg_examples.append(neg_examples)
-         self.data_dict[label_key][0] = start_index + self.hparams.num_contrastive_samples
       
       assert(len(pos_neg_examples) == self.hparams.num_neg_examples + 1)  
       assert(len(pos_neg_label_ids) == self.hparams.num_neg_examples + 1)      
@@ -193,8 +190,9 @@ class SERContrastive(SER):
       #print(pos_neg_label_ids)
       return pos_neg_examples, pos_neg_label_ids
       
-   def get_contrastive_samples(self, files, start_index, curr_num_samples, anchor_wav_file_path):
+   def get_contrastive_samples(self, files, start_index, curr_num_samples, anchor_wav_file_path, label_key):
       mels_list = []
+      i = 0
       for file in files[start_index:]:
          if curr_num_samples == self.hparams.num_contrastive_samples:
             break
@@ -209,6 +207,9 @@ class SERContrastive(SER):
             assert(log_mel.shape == (1,32,101))
             mels_list.append(log_mel)
             curr_num_samples += 1
+         i+=1
+      #update starting index in data_dict:
+      self.data_dict[label_key][0] += i
       return mels_list
       
    def build_data_dict(self):
