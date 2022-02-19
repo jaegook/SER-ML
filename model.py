@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class SEREncoder(nn.Module):		#Speech Emotion Recognition Model
+class SERSupervisedContrastiveModel(nn.Module):		#Speech Emotion Recognition Model
    def __init__(self, hparams, device="cpu"):
       super().__init__()
       self.hparams = hparams
@@ -15,7 +15,15 @@ class SEREncoder(nn.Module):		#Speech Emotion Recognition Model
                                  nn.ReLU(),
                                  nn.Linear(2048,1024)]
                                          )
-      self.output = nn.Linear(1024,6)       #the output layer receives input from encoder
+      self.projection = nn.ModuleList()     #projection layer
+      self.projection.extend(
+                                [nn.Linear(1024, 512),
+                                 nn.ReLU(),
+                                 nn.Linear(512,128),
+                                 nn.ReLU()]
+                                         )
+      
+      self.classifier = nn.Linear(1024,6)       #the output layer receives input from encoder
       
       #self.neuralnetwork.append(nn.Conv2d(1, 128, [3,3], 1))	#know the shape of this output
       #self.neuralnetwork.append(nn.ReLU())
@@ -26,31 +34,17 @@ class SEREncoder(nn.Module):		#Speech Emotion Recognition Model
       #self.neuralnetwork.append(nn.Linear(413696, 6))		# 6 = total emotions we have to label
       #self.neuralnetwork.append(nn.Softmax())      
 
-   def forward(self, inputs):   	#
+   def forward(self, inputs, contrastive):   	#
       # input shape: [batch_size, n_mels, n_frames]
       #x = torch.unsqueeze(inputs, dim=1)	#unsqueeze adds 1 to dim 1. New Shape = [batch_size, num_channels=1, n_mels, n_frames]
       x = inputs
-      for module in self.encoder:
-         x = module(x)      
-      return x 	#x -> logits
-
-class SERContrastiveModel(nn.Module):		
-   def __init__(self, hparams, device="cpu"):
-      super().__init__()
-      self.hparams = hparams
-      self.device = device
-      self.projection = nn.ModuleList()     #projection layer
-      self.projection.extend(
-                                [nn.Linear(1024, 512),
-                                 nn.ReLU(),
-                                 nn.Linear(512,128),
-                                 nn.ReLU()]
-                                         )
-
-   def forward(self, inputs):   	# will get input from SERModel's encoder
-      # input shape: [batch_size, n_mels, n_frames]
-      #x = torch.unsqueeze(inputs, dim=1)	#unsqueeze adds 1 to dim 1. New Shape = [batch_size, num_channels=1, n_mels, n_frames]
-      x=inputs
-      for module in self.projection:
-         x = module(x)      
+      for encoder_module in self.encoder:
+         x = encoder_module(x) 
+      if contrastive:
+         x = nn.functional.normalize(x, p=2, dim=1)
+         for proj_module in self.projection:
+            x = proj_module(x)
+      else:
+         x = x.detach()
+         x = self.classifer(x)      
       return x 	#x -> logits

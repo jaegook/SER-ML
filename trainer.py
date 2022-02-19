@@ -8,7 +8,7 @@ import os.path
 
 from audio_utils import load_audio_file, plot_time_domain, test
 from dataset import create_dataloader, create_contrastive_dataloader
-from model import SEREncoder, SERContrastiveModel
+from model import SERSupervisedContrastiveModel
 from hparams import Hyperparameters
 from losses import ContrastiveLoss
 
@@ -17,15 +17,14 @@ class SERTrainer:
    def __init__(self, hparams, device="cpu"):
       self.hparams = hparams
       self.device = device
-      self.encoder = SEREncoder(hparams, device)
-      self.contrastive_model = SERContrastiveModel(hparams, device)
+      self.ser_supcon = SERSupervisedContrastiveModel(hparams, device)
       self.loss_fn = nn.CrossEntropyLoss
       self.contrastive_loss_fn = ContrastiveLoss()
-      self.optimizer = optim.Adam(list(self.encoder.parameters())+list(self.contrastive_model.parameters()), hparams.init_lr, betas=[0.9,0.999])	# nn.module calls parameters()
+      self.optimizer = optim.Adam(self.ser_supcon.parameters(), hparams.init_lr, betas=[0.9,0.999])	# nn.module calls parameters()
       self.lr_scheduler = optim.lr_scheduler.LinearLR(self.optimizer, hparams.init_lr, hparams.end_lr)
 
    def train_step(self, x, label):
-      logits = self.model(x)	# nn.module passes x to model.forward()
+      logits = self.ser_supcon(x, contrastive=False)	# nn.module passes x to model.forward()
       loss = self.loss_fn(logits, label)
       loss.backward()
       self.optimizer.step()
@@ -33,17 +32,16 @@ class SERTrainer:
       self.optimizer.zero_grad()
       return loss, logits
    def contrastive_train_step(self, x, labels):
-      encoder_output = self.encoder(x)                                      #outputs 1024 feature vectors for each example, in our case 120 [120,1024]
+      output = self.ser_supcon(x, contrastive=True)                                      #outputs 1024 feature vectors for each example, in our case 120 [120,1024]
       #print("type(ENCODER_OUTPUT)={}, ENCODER_OUTPUT.size()={}".format(type(encoder_output),encoder_output.size()))
-      normalized_encoder_output = nn.functional.normalize(encoder_output, p=2, dim=1)
+      
       #print("type(normalized_encoder_output)={}, normalized_encoder_output.size()={}".format(type(normalized_encoder_output), normalized_encoder_output.size()))
 
-      projection_output = self.contrastive_model(normalized_encoder_output)            #projection_output shape -> [120,128]
       #print("projection_output.shape=", projection_output.shape)      
       
       
-      elem_per_group = len(projection_output)//self.hparams.num_contrastive_samples #we want 2 groups when we split dim=0
-      projection_output = torch.split(projection_output, elem_per_group, dim=0) #shape: [120,128] -> ([60,128],[60,128])
+      elem_per_group = len(output)//self.hparams.num_contrastive_samples #we want 2 groups when we split dim=0
+      projection_output = torch.split(output, elem_per_group, dim=0) #shape: [120,128] -> ([60,128],[60,128])
       #for step, x in enumerate(projection_output):
       #   print("{}: x.size()={} ".format(step, x.size()))
       
@@ -85,14 +83,14 @@ class SERTrainer:
       return train_loss
       
    def contrastive_train_loop(self, train_dataloader, valid_dataloader, label_builder):
-      self.encoder.to(self.device)
-      self.contrastive_model.to(self.device)
+      self.ser_supcon.to(self.device)
       best_loss = float("inf")
+      print("Starting contrastive training...")
       for epoch in range(self.hparams.num_contrastive_epochs):
          total_loss = 0.0
-         self.encoder.train()
-         self.contrastive_model.train()
-         start_time = time.time()
+         self.ser_supcon.train()
+         start_time = time.time
+         #print(f"starting training for epoch:{epoch}")
          for step, (pos_negs, labels) in enumerate(train_dataloader):
             
             #query aka anchor is in pos_negs
@@ -117,7 +115,7 @@ class SERTrainer:
             if (step + 1) % self.hparams.contrastive_validation_step == 0:
                avg_loss = total_loss / (step + 1)
                contrastive_model = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
-               self.save_contrastive_model(self.encoder, self.contrastive_model, contrastive_model, epoch, avg_loss)
+               self.save_model(self.ser_supcon, contrastive_model, epoch, avg_loss)
          end_time = time.time()
          print("time for 1 epoch (min) =",(end_time-start_time)/60)
          print("Validating...")
@@ -125,7 +123,7 @@ class SERTrainer:
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
          #evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
          cont_model_path = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
-         self.save_contrastive_model(self.encoder, self.contrastive_model, cont_model_path, epoch, avg_loss)
+         self.save_model(self.ser_supcon, cont_model_path, epoch, avg_loss)
          """
          start_time = time.time()
          val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.model, self.loss_fn, self.device)
@@ -142,15 +140,16 @@ class SERTrainer:
             #self.save_model(self.model, model_path, epoch, best_loss)		                                #create this model
         """
    def train_loop(self, train_dataloader, valid_dataloader, label_builder):
-      self.model.to(self.device)
+      self.ser_supcon.to(self.device)
       best_loss = float("inf")
+      print("Starting classifier training...")
       for epoch in range(self.hparams.num_epochs):
          total_loss = 0.0
          pred_list = []
          true_label_list = []
-         self.model.train()
+         self.ser_supcon.train()
          start_time = time.time()
-         print(f"starting training for epoch:{epoch}")
+         #print(f"starting training for epoch:{epoch}")
          for step, (x, label) in enumerate(train_dataloader):
             x = x.to(self.device)
             label = label.to(self.device)
@@ -167,10 +166,10 @@ class SERTrainer:
          print("Validating...")
          avg_loss = total_loss / (step + 1)
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
-         #evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
-         """
+         
+         evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
          start_time = time.time()
-         val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.model, self.loss_fn, self.device)
+         val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.ser_supcon, self.loss_fn, self.device)
          end_time = time.time()
          print("time for validation (min) =", (end_time - start_time)/60)
          print("Epoch = {}, Validation Loss = {}, Validation Accuracy = {}".format(epoch, val_loss, acc))
@@ -181,8 +180,8 @@ class SERTrainer:
             best_loss = val_loss
             print("best loss = {}".format(best_loss))            
             model_path = self.make_model_path(epoch, best_loss, self.hparams.model_dir)				#create this fn
-            #self.save_model(self.model, model_path, epoch, best_loss)		                                #create this model
-        """           
+            self.save_model(self.ser_supcon, model_path, epoch, best_loss)		                                #create this model
+  
    
    def make_model_path(self, epoch, loss, model_dir):
       model_path = f"{model_dir}/SER_SUPCON_{epoch}_{loss}.pth"
@@ -203,17 +202,6 @@ class SERTrainer:
       model_path = f"{model_dir}/SER_SUPCON_{epoch}_{loss}.pth"
       return model_path
       
-   def save_contrastive_model(self, encoder, contrastive_model, model_path, epoch, best_loss):
-      state = {
-               'epoch': epoch,
-               'encoder_state_dict': encoder.state_dict(),
-               'contrastive_state_dict': contrastive_model.state_dict(),
-               'optimizer': self.optimizer.state_dict(),
-               'scheduler': self.lr_scheduler.state_dict(),
-               'best_loss': best_loss,
-               }
-      print("saving to {}...".format(model_path))
-      torch.save(state, model_path)
    
 def parse_args():
    parser = argparse.ArgumentParser()
@@ -222,12 +210,18 @@ def parse_args():
    args = parser.parse_args()
    return args
 
-def train(train_dataloader, valid_dataloader, hparams, label_builder):
+def train(args, hparams):
+   train_contrastive_dataloader, label_builder = create_contrastive_dataloader(args.data_dirs[0], hparams)
+   valid_contrastive_dataloader, _ = create_contrastive_dataloader(args.data_dirs[1], hparams)
+   train_dataloader, _ = create_dataloader(args.data_dirs[0], hparams)  
+   valid_dataloader, _ = create_dataloader(args.data_dirs[1], hparams)
+   
    device = "cuda" if torch.cuda.is_available() else "cpu"      #use gpu if available
    print(f"using {device}")
    trainer = SERTrainer(hparams, device)
-   trainer.contrastive_train_loop(train_dataloader, valid_dataloader, label_builder)
-   #trainer.train_loop(train_dataloader, valid_dataloader, label_builder)
+   
+   trainer.contrastive_train_loop(train_contrastive_dataloader, valid_contrastive_dataloader, label_builder)
+   trainer.train_loop(train_dataloader, valid_dataloader, label_builder)
 
 def check_environment(args, hparams):
    if not os.path.isdir(hparams.model_dir):
@@ -245,15 +239,8 @@ def main():
    args = parse_args()
    hparams = Hyperparameters()
    check_environment(args, hparams)
+   train(args, hparams)
    
-   train_contrastive_dl, lb = create_contrastive_dataloader(args.data_dirs[0], hparams)
-   valid_contrastive_dl, lb = create_contrastive_dataloader(args.data_dirs[1], hparams)
-   #train_dataloader, lb = create_dataloader(args.data_dirs[0], hparams)  
-   #valid_dataloader, lb = create_dataloader(args.data_dirs[1], hparams)
-   
-   train(train_contrastive_dl, valid_contrastive_dl, hparams, lb)
-   #train(train_dataloader, valid_dataloader, hparams, lb)
-
   
 if __name__ == "__main__":
    main()
