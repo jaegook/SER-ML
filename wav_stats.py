@@ -3,34 +3,48 @@ import numpy as np
 
 from hparams import Hyperparameters
 from audio_utils import load_audio_file
-from dataset import VoiceConversionDataset
+from file_utils import recursive_filter_wav_files
+
 
 def parse_args():
    parser = argparse.ArgumentParser()
-   parser.add_argument("-b", "--batch_size", type=int, default=16, help="Batch size")
    parser.add_argument("-d", "--data_dir", type=str, default="data", help="A data directory")
+   parser.add_argument("-ss", "--samp_size", type=int, default=1, help="The sample size in seconds")
+   parser.add_argument("-sr", "--samp_rate", type=int, default=16000, help="The sampling rate in samples per second (Hz)")
    args = parser.parse_args()
    return args
 
+#filter data_list to return all wav file paths that are at least sample_size or longer
+def filtered_wav_files(data_list, sr, sample_size):
+   filtered_data = []
+   for file in data_list:
+      wav, _ = load_audio_file(file, sr)
+      if len(wav) >= sample_size:
+         #print(f"adding wav of length {len(wav)}")
+         filtered_data.append(file)         
+   return filtered_data
+
 def create_time_bins(times, max_time):	#fix this to include right
-   bins = np.zeros(int(max_time+1))
+   max_time = int(max_time)
+   bins = np.zeros(max_time+1)
    for time in times:
       bins[int(time)] += 1
    return bins
 
+
+#returns the time length of each .wav file  
 def get_time_length(data_list, sr):
-   #returns the time length of each .wav file  
+   print("In get_time_length...")
    times =[]
-   i = 1
    for file in data_list:
       y, sr = load_audio_file(file, sr)
-      print("file =", file)
-      print("y, sr =", i, y, sr)
+      #print(f"len(y)/sr = {len(y)/sr}")
+      #print(f"len(y) = {len(y)}")
       times.append(len(y)/sr)
-      i += 1
    return times
-
-def get_emotion_bins(data_list): #count how many of each emotion there is in our data -> see if it is evenly distributed 
+   
+#count how many of each emotion there is in our data -> see if it is evenly distributed 
+def get_label_bins(data_list): 
    dict = {}
    for file in data_list:
       emotion = file.split("_")[2]
@@ -39,26 +53,32 @@ def get_emotion_bins(data_list): #count how many of each emotion there is in our
       else:
          dict[emotion] = 1
    return dict
+
 def main():
    
    args = parse_args()
-   hparams = Hyperparameters()
+   print(f"args = {args}")
+   data_list = recursive_filter_wav_files(args.data_dir)
+   sampling_rate = args.samp_rate
+   sample_size = args.samp_size * sampling_rate
+   print(f"len(data_list) = {len(data_list)}")
+   print(f"sample_size = {sample_size}")
+   print(f"sampling_rate - {sampling_rate}")
    
-   ds = VoiceConversionDataset(args.data_dir, hparams)
-   data_list = ds.data_list
-   print("data_list = ", data_list)
-
-   times = get_time_length(data_list, hparams.sampling_rate)
+   filtered_data_list = filtered_wav_files(data_list, sampling_rate, sample_size)
+   print(f"len(filtered_data_list) = {len(filtered_data_list)}")
    
-   min = np.min(times)
-   max = np.max(times)
-   mean = np.mean(times)
+   times = get_time_length(filtered_data_list, sampling_rate)
    
-   print("min length (s) =", min)
-   print("max length (s) =", max)
-   print("avg length (s) =", mean)
+   min_data = np.min(times)
+   max_data = np.max(times)
+   mean_data = np.mean(times)
    
-   time_bins = create_time_bins(times, max)
+   print("min data length (s) =", min_data)
+   print("max data length (s) =", max_data)
+   print("avg data length (s) =", mean_data)
+   
+   time_bins = create_time_bins(times, max_data)
    
    #view time bins
    for i, x in enumerate(time_bins):
@@ -66,8 +86,8 @@ def main():
    print("sum of all bins=", np.sum(time_bins))
    
    #view emotion bins
-   emotion_bins = get_emotion_bins(data_list)
-   for pair in emotion_bins.items():
+   label_bins = get_label_bins(filtered_data_list)
+   for pair in label_bins.items():
       print(pair)   
   
   

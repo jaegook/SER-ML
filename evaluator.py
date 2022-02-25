@@ -43,9 +43,10 @@ def evaluate(valid_dataloader, model, loss_fn=None, device="cpu"):
       with torch.no_grad():
          
          x = x.to(device)
+         x = torch.unsqueeze(x, dim = 1) #need to unsqeeze for classifier training
          label = label.to(device)
          
-         logits = model(x)
+         logits = model(x,contrastive=False)
          preds = torch.argmax(logits, dim=1)
          true_labels = torch.argmax(label, dim=1)
          pred_list += preds.tolist()

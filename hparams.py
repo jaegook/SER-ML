@@ -1,13 +1,16 @@
 
 class Hyperparameters: 
+# parameters
+   mode = "classifier"
+
 # parameters for audio processing
    sampling_rate = 16000
    frame_size = 512   		# 32 ms
    hop_length = 160   		# 10 ms
    n_mels = 32			    #
-   sample_size = 16000		# 1 second because it is smaller than our minimum length in our data_list
+   sample_size = 16000*4	# 1 second because it is smaller than our minimum length in our data_list
    trim_silence = True
-
+   num_frames = 101
 
 # parameters for classifier training
    batch_size = 32
@@ -21,7 +24,7 @@ class Hyperparameters:
 # parameters for contrastive training   
    num_contrastive_samples = 2
    contrastive_batch_size = 2
-   num_frames = 101
+
    temperature = 0.1
    num_neg_examples = 2
    num_contrastive_epochs = 20

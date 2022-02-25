@@ -46,9 +46,9 @@ class SER(Dataset):
       #print("one_hot_index=", one_hot_index)      
 
       # create one hot vector
-      #label = np.zeros(self.label_builder.count())
-      #label[one_hot_index] = 1
-      label = one_hot_index
+      label = np.zeros(self.label_builder.count())
+      label[one_hot_index] = 1
+      
       
       wav, sr = load_audio_file(wav_file_path, self.hparams.sampling_rate)
      
@@ -66,7 +66,7 @@ class SER(Dataset):
       # get and return the mel spectrogram
       log_mel_spectrogram = wav_to_mel(sampled_wav, self.hparams.sampling_rate, self.hparams.frame_size, self.hparams.hop_length, self.hparams.n_mels)
       # ->log_mel_spectrogram shape = [n_mels, n_frames]
-                  
+      #print(f"label= {label}")
       return log_mel_spectrogram, label 
 
    def filter_data_list(self):
@@ -231,18 +231,18 @@ def create_dataloader(data_dir, hparams):
    data_loader = DataLoader(ds, batch_size=hparams.batch_size, shuffle=True, num_workers=hparams.num_workers)
  
    return data_loader, ds.label_builder		
-
+'''
 def pad(batch):
    print(f"type(batch), {type(batch)}, {len(batch)}, {type(batch[0])}, {type(batch[1])}")
    print(f"{type(batch[0][0])}, {type(batch[0][1])}")
    print(f"{type(batch[0][0])}, {len(batch[0][0])}")
    print(f"{batch[0][0].shape}, {batch[0][1].shape}")
    print(f"{batch[1][0].shape}, {batch[1][1].shape}")
-   
+'''
    
 def create_contrastive_dataloader(data_dir, hparams):
    ds = SERContrastive(data_dir, hparams)
-   data_loader = DataLoader(ds, batch_size=hparams.contrastive_batch_size, shuffle=True, drop_last=True)#, collate_fn=pad)
+   data_loader = DataLoader(ds, batch_size=hparams.contrastive_batch_size, shuffle=True, drop_last=True)  #, collate_fn=pad)
    return data_loader, ds.label_builder
 
 
