@@ -11,7 +11,7 @@ class SERSupConModel(nn.Module):		#Speech emotion recognition, supervised contra
                                 [nn.Conv2d(1, 128, [7,7], 1, padding='same'),   #input needs to be of shape [batch_size, num_channels, n_mels, n_frames]
                                  nn.ReLU(),
                                  nn.Flatten(),
-                                 nn.Linear(1642496, 2048),
+                                 nn.Linear(413696, 2048),
                                  nn.ReLU(),
                                  nn.Linear(2048,1024)]
                                          )
@@ -39,16 +39,17 @@ class SERSupConModel(nn.Module):		#Speech emotion recognition, supervised contra
       #x = torch.unsqueeze(inputs, dim=1)	#unsqueeze adds 1 to dim 1. New Shape = [batch_size, num_channels=1, n_mels, n_frames]
       x = inputs
       for encoder_module in self.encoder:
-         print("in encoder")
+         #print("in encoder")
+         print(x)
          x = encoder_module(x) 
       if contrastive:
-         print("in contrastive")
+         #print("in contrastive")
          x = nn.functional.normalize(x, p=2, dim=1)
          for proj_module in self.projection:
-            print("in projection")
+            #print("in projection")
             x = proj_module(x)
       else:
-         print("in mode = sup_con, classifier")
+         #print("in mode = sup_con, classifier")
          x = x.detach()
          x = self.classifier(x)  
          #print(f"type(x)={type(x)}")
@@ -64,9 +65,10 @@ class SERClassifierModel(nn.Module):		#Speech Emotion Recognition Model
                                 [nn.Conv2d(1, 128, [7,7], 1, padding='same'),   #input needs to be of shape [batch_size, num_channels, n_mels, n_frames]
                                  nn.ReLU(),
                                  nn.Flatten(),
-                                 nn.Linear(1642496, 2048),
+                                 nn.Linear(1232896, 2048),
                                  nn.ReLU(),
-                                 nn.Linear(2048,1024)]
+                                 nn.Linear(2048,1024),
+                                 nn.ReLU()]
                                          )
       
       self.classifier = nn.Linear(1024,6)       #the output layer receives input from encoder
@@ -85,8 +87,13 @@ class SERClassifierModel(nn.Module):		#Speech Emotion Recognition Model
       #x = torch.unsqueeze(inputs, dim=1)	#unsqueeze adds 1 to dim 1. New Shape = [batch_size, num_channels=1, n_mels, n_frames]
       x = inputs
       for encoder_module in self.encoder:
-         print("in encoder")
+         print("in encoder", torch.max(x).item(), torch.min(x).item())
+         print("in encodcer", encoder_module)
+         #print("in encoder")
          x = encoder_module(x)
-      x = self.classifier(x)   
-      print("after self.classifier(x)")         
+      print("in encoder", torch.max(x).item(), torch.min(x).item())
+      print("in encoder", self.classifier)
+      x = self.classifier(x)  
+      print("in encoder", torch.max(x).item(), torch.min(x).item())       
+      #print("after self.classifier(x)")         
       return x 	#x -> logits

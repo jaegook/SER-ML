@@ -34,7 +34,7 @@ def compute_metrics(true_label_list, pred_list):
             }
    
    
-def evaluate(valid_dataloader, model, loss_fn=None, device="cpu"):
+def evaluate(valid_dataloader, model, loss_fn=None, mode="classifier", device="cpu"):
    pred_list = []
    true_label_list = []  
    loss = 0
@@ -45,8 +45,10 @@ def evaluate(valid_dataloader, model, loss_fn=None, device="cpu"):
          x = x.to(device)
          x = torch.unsqueeze(x, dim = 1) #need to unsqeeze for classifier training
          label = label.to(device)
-         
-         logits = model(x,contrastive=False)
+         if mode == "classifier":
+            logits = model(x)
+         elif mode == "supcon":
+            logits = model(x,contrastive=False)
          preds = torch.argmax(logits, dim=1)
          true_labels = torch.argmax(label, dim=1)
          pred_list += preds.tolist()

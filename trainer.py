@@ -25,18 +25,18 @@ class SERTrainer:
 
    def train_step(self, x, label):
       logits = self.ser_classifier(x)	# nn.module passes x to model.forward()
-      print(f"logits.shape ={label.shape}")
-      print(f"label.shape={label.shape}")
-      print("computing loss")
+      #print(f"logits.shape ={label.shape}")
+      #print(f"label.shape={label.shape}")
+      #print("computing loss")
       loss = self.classifier_loss_fn(logits, label)
-      print("backwards prop")
+      #print("backwards prop")
       loss.backward()
-      print(f"loss = {loss}")
-      print("optimizing")
+      #print(f"loss = {loss}")
+      #print("optimizing")
       self.classifier_optimizer.step()
-      print("scheduler step")
-      self.lr_scheduler.step()
-      print("zero grad")
+      #print("scheduler step")
+      #self.lr_scheduler.step()
+      #print("zero grad")
       self.classifier_optimizer.zero_grad()
       return loss, logits
       
@@ -66,19 +66,19 @@ class SERTrainer:
             if step % self.hparams.display_step == 0:
                print("Epoch = {}, Step = {}, Training Loss = {}".format(epoch, step, train_loss))
             if (step+1) % self.hparams.validation_step == 0:
-               best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss, label_builder, self.ser_classifier, self.classifier_optimizer)
+               best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss, label_builder, self.ser_classifier, self.classifier_optimizer, self.classifier_loss_fn)
          
          epoch_end_time = time.time()
          print("time for 1 epoch (min) =",(epoch_end_time-epoch_start_time)/60)
          avg_loss = total_loss / (step + 1)
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
          print("Validating...")
-         best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss, label_builder, self.ser_classifier, self.classifier_optimizer)
+         best_loss = self.validate_and_save_model(valid_dataloader, epoch, best_loss, label_builder, self.ser_classifier, self.classifier_optimizer, self.classifier_loss_fn)
   
-   def validate_and_save_model(self, valid_dataloader, epoch, best_loss, label_builder, model, optimizer):
+   def validate_and_save_model(self, valid_dataloader, epoch, best_loss, label_builder, model, optimizer, loss_fn):
          print(f"Validating for epoch: {epoch}")
          val_start_time = time.time()
-         val_loss, metrics = evaluator.evaluate(valid_dataloader, model, self.loss_fn, self.device)
+         val_loss, metrics = evaluator.evaluate(valid_dataloader, model, loss_fn, self.hparams.mode, self.device)
          val_end_time = time.time()
          print("time for validation (min) =", (val_end_time - val_start_time)/60)
          print("Epoch = {}, Validation Loss = {}".format(epoch, val_loss))
@@ -88,7 +88,7 @@ class SERTrainer:
             best_loss = val_loss
             print("best loss = {}".format(best_loss))            
             model_path = self.make_model_path(epoch, best_loss, self.hparams.model_dir)				            #
-            self.save_model(model, model_path, epoch, best_loss, optimizer)		                                
+            #self.save_model(model, model_path, epoch, best_loss, optimizer)		                                
          
          return best_loss
          
@@ -120,7 +120,7 @@ class SERSupConTrainer(SERTrainer):
       loss = self.classifier_loss_fn(logits, label)
       loss.backward()
       self.classifier_optimizer.step()  #question: how is this optimizer connected to the ser_supcon? we gave it ser_classifier's parameters
-      self.lr_scheduler.step()
+      #self.lr_scheduler.step()
       self.classifier_optimizer.zero_grad()
       return loss, logits
       pass
@@ -148,7 +148,8 @@ class SERSupConTrainer(SERTrainer):
             if step % self.hparams.display_step == 0:
                print(f"Epoch: {epoch}, Step: {step}, Train loss: {train_loss}")
             if (step + 1) % self.hparams.validation_step == 0:
-              validate_and_save_model(valid_dataloader, epoch, best_loss, label_builder, self.ser_supcon, self.classifier_optimizer)
+               print(f"validating...")
+               validate_and_save_model(valid_dataloader, epoch, best_loss, label_builder, self.ser_supcon, self.classifier_optimizer)
          epoch_end_time = time.time()
          print("time for 1 epoch (min) =",(epoch_end_time-epoch_start_time)/60)
          avg_loss = total_loss / (step + 1)
@@ -203,7 +204,8 @@ class SERSupConTrainer(SERTrainer):
             if (step + 1) % self.hparams.contrastive_validation_step == 0:
                avg_loss = total_loss / (step + 1)
                contrastive_model = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
-               self.save_model(self.ser_supcon, contrastive_model, epoch, avg_loss, self.contrastive_optimizer)
+               print("saving model..")
+               #self.save_model(self.ser_supcon, contrastive_model, epoch, avg_loss, self.contrastive_optimizer)
          end_time = time.time()
          print("time for 1 epoch (min) =",(end_time-start_time)/60)
          print("Validating...")
@@ -211,7 +213,7 @@ class SERSupConTrainer(SERTrainer):
          print("Epoch ={} average loss = {}".format(epoch, avg_loss))
          #evaluator.evaluate_and_display(true_label_list, pred_list, label_builder)
          cont_model_path = self.make_contrastive_model_path(epoch, avg_loss, self.hparams.model_dir)
-         self.save_model(self.ser_supcon, cont_model_path, epoch, avg_loss, self.contrastive_optimizer)
+         #self.save_model(self.ser_supcon, cont_model_path, epoch, avg_loss, self.contrastive_optimizer)
          """
          start_time = time.time()
          val_loss, acc, precision, recall, fscore, support = evaluator.evaluate(valid_dataloader, self.model, self.loss_fn, self.device)
@@ -232,7 +234,11 @@ class SERSupConTrainer(SERTrainer):
       return model_path
       
 def train(args, hparams):
-   device = "cuda" if torch.cuda.is_available() else "cpu"      #use gpu if available
+   if args.device == "cuda":
+      device = "cuda" if torch.cuda.is_available() else "cpu"      #use gpu if available
+   elif args.device == "cpu":
+      device = "cpu"
+   
    print(f"using {device}")
    if hparams.mode == "classifier":
       trainer = SERTrainer(hparams, device)
@@ -268,6 +274,7 @@ def parse_args():
    parser.add_argument("-b", "--batch_size", type=int, default=16, help="Batch size")
    parser.add_argument("-d", "--data_dirs", nargs="+", required=True, help="A data directory")
    parser.add_argument("-m", "--mode", type=str, default="sup_con", help="training mode either: classifier or sup_con") 
+   parser.add_argument("-device", "--device", type=str, default="cuda", help="enter device: cpu or cuda")
    args = parser.parse_args()
    return args
    
